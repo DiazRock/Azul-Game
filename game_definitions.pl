@@ -1,7 +1,7 @@
 :- dynamic build_boards/2.
 % Main predicate 
-play_azul(NumberOfPlayers, Narrative):- init_db(NumberOfPlayers, InitialDb),
-                                        game(InitialDb, [InitialDb| Narrative]).
+%play_azul(NumberOfPlayers, Narrative):- init_db(NumberOfPlayers, InitialDb),
+%                                        game(InitialDb, [InitialDb| Narrative]).
 
 % init database for each kind of game (depends of the number of players)
 init_db( 4, InitialDb):- build_boards(4, Boards).
@@ -33,6 +33,7 @@ floor_line(X) :- X >= 0, X =< 7.
 minor_position( Compound, Position, Color):- arg(Pos, Compound, Color),
                                                   Pos - 5 > Position.
 
+line_of_colors([blue, yellow, red, black, white]).
 wall_for_board([blue, yellow, red, black, white], [], -5) :- !.
 wall_for_board(All_Colors, [Head | Tail], Position) :- line_of_colors(All_Colors),
                                               compound_name_arguments(Compound, colors, All_Colors),
@@ -43,3 +44,6 @@ wall_for_board(All_Colors, [Head | Tail], Position) :- line_of_colors(All_Colors
 
 format_wall([]) :- write('').
 format_wall([Head | Tail]) :- write(Head), nl, format_wall(Tail).
+
+%% Compose board method
+compose_board()
