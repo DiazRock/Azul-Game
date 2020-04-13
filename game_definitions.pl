@@ -4,51 +4,47 @@ play_azul(NumberOfPlayers):- init_db(NumberOfPlayers, InitialDb),
                                         game([InitialDb | History]).
 
 % State Engine
-game([]) :- !.
+game([]):- !.
 game([[Players, 
        FactoryList, 
        CenterTokens, 
        Bag, 
        GameState, 
        FloorLine, 
-       TokensInTopBox]| RestHistory]):-  change_state(GameState, NewGameState),
-                                         put_initial_token_in_the_center(CenterTokens, NewCenterTokens),
-                                         put_tokens([Bag, TokensInTopBox], FactoryList, FactoryListStep1, [NewBag, NewTokensInTopBox]),
+       TokensInTopBox]| RestHistory]):-  put_tokens([Bag, TokensInTopBox], FactoryList, FactoryListStep1, [NewBag, NewTokensInTopBox]),
                                          %compound_name_arguments(NewFactoryListCompound, NameFactory, NewFactoryList),
-                                         %players_decisions(Players, FactoryListStep1, ),
-                                         game([[Players, NewFactoryList, NewCenterTokens, NewBag, NewGameState, NewFloorLine, NewTokensInTopBox] |RestHistory]).
+                                         players_decisions(Players, FactoryListStep1, CenterTokens, NewPlayersState, NewFactoryList, NewCenterTokens),
+                                         change_state(GameState, NewGameState),
+                                         game([[NewPlayersState, NewFactoryList, NewCenterTokens, NewBag, NewGameState, NewFloorLine, NewTokensInTopBox] |RestHistory]).
+
+players_decisions(Players, FactoryList, )
 
 equal(X, Y):- X == Y.
-put_tokens([Bag | TokensInTopBox], [], [], [Bag | TokensInTopBox]):- !.
-put_tokens([Bag , TokensInTopBox], 
-           [HeadF | FactoryList], 
-           [ NewHeadF | NewFactoryLists], 
+put_tokens([Bag , TokensInTopBox], [], [], [Bag , TokensInTopBox]):- !.
+put_tokens([Bag , TokensInTopBox],
+           [HeadF | FactoryList],
+           [NewHeadF | NewFactoryList],
            [LastBag , LastTokensInTopBox] ):- partition(equal(non_color), HeadF, EmptyPartOfFactory, PartWithColors),
-                                              fill_empty([Bag , TokensInTopBox], EmptyPartOfFactory, NewPart, NewBag, NewTokensInTopBox),
+                                              fill_empty([Bag , TokensInTopBox], EmptyPartOfFactory, NewPart, [NewBag, NewTokensInTopBox]),                                              
                                               append(NewPart, PartWithColors, NewHeadF),
                                               put_tokens([NewBag , NewTokensInTopBox], FactoryList, NewFactoryList, [LastBag , LastTokensInTopBox]).
 
-fill_empty([Bag | TokensInTopBox], 
-            EmptyPartOfFactory, 
-            NewPart, 
-            NewBag, 
-            NewTokensInTopBox ):- length(EmptyPartOfFactory, TotalCount),
-                                  take_from(Bag, TotalCount, TakedFromBag),
-                                  length(TakedFromBag, CountFromBag), CountFromTopBox is TotalCount - CountFromBag,
-                                  take_from(TokensInTopBox, CountFromTopBox, TakedFromTopBox),
-                                  append(TakedFromBag, TakedFromTopBox, NewPart),
-                                  append(NewBag, TakedFromBag, Bag),
-                                  append(NewTokensInTopBox, TakedFromTopBox, TokensInTopBox).
+fill_empty([Bag, TokensInTopBox],
+            EmptyPartOfFactory,
+            NewPart,
+            [NewBag,
+            NewTokensInTopBox] ):- length(EmptyPartOfFactory, TotalCount),
+                                   take_from(Bag, TotalCount, TakedFromBag, NewBag),
+                                   length(TakedFromBag, CountFromBag), CountFromTopBox is TotalCount - CountFromBag,
+                                   take_from(TokensInTopBox, CountFromTopBox, TakedFromTopBox, NewTokensInTopBox),
+                                   append(TakedFromBag, TakedFromTopBox, NewPart).
 
-take_from([], _, []):- !.
-take_from(_, 0, []):- !.
-take_from( PlaceForTake, Count, [Element| Tail]):- random_select(Element, PlaceForTake, Rest),
-                                                   NewCount is Count -1,
-                                                   take_from(Rest, NewCount, Tail).
+take_from([], _, [], []):- !.
+take_from(PlaceForTake, 0, [], PlaceForTake):- !.
+take_from( PlaceForTake, Count, [Element| Tail], NewPlaceForTake):- random_select(Element, PlaceForTake, Rest),
+                                                                    NewCount is Count -1,
+                                                                    take_from(Rest, NewCount, Tail, NewPlaceForTake).
 
-put_initial_token_in_the_center(CenterTokens, NewCenterTokens) :- compound_name_arguments(CenterTokens, _, Arg),
-                                                                  append(Arg1, [(init__token, 0)], Arg),
-                                                                  append(Arg1, [(init__token, 1)], NewCenterTokens).
 
 change_state(OldGameState, NewGameState):- call(OldGameState, Round, Phase),
                                            concat(round, RoundNumberStr, Round), atom_number(RoundNumberStr, RoundNumber),
@@ -66,14 +62,14 @@ init_db(NumberOfPlayers,
         [Players, 
         FactoryList, 
         CenterTokens, 
-        Bag, 
-        GameState, 
-        FloorLine, 
+        Bag,
+        GameState,
+        FloorLine,
         TokensInTopBox]):-  build_players(NumberOfPlayers, Players),
                             number_of_factories_by_number_of_players(NumberOfPlayers, NumberOfFactories),
                             build_factories(NumberOfFactories, FactoryList),
                             create_list([(color(blue), 20),(color(yellow), 20), (color(red), 20), (color(balck), 20), (color(white), 20)], Bag),
-                            CenterTokens = [],                                                                        
+                            CenterTokens = [init_token],                                                                        
                             GameState = game_state(round0, non_step),                                                                
                             FloorLine = floor_line(non_color, non_color, non_color, non_color, non_color, non_color, non_color),                                                                        
                             TokensInTopBox = [].                                                                        
@@ -87,9 +83,9 @@ build_players(NumberOfPlayers, [Head| Players]):- build_player_info(NumberOfPlay
                                                   X is NumberOfPlayers - 1,
                                                   build_players(X, Players).
 
-build_player_info( PlayerNumber, Info) :- compose_board(X),
-                                          concat(player, PlayerNumber, Player),
-                                          compound_name_arguments(Info, Player, X).
+build_player_info(PlayerNumber, Info):- compose_board(X),
+                                        concat(player, PlayerNumber, Player),
+                                        compound_name_arguments(Info, Player, X).
 
 build_factories(0, []) :- !.
 build_factories(NumberOfFactories, [Head | FactoryList]):- X is NumberOfFactories - 1,
