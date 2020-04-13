@@ -1,24 +1,82 @@
-:- dynamic assert_list/1, init_db/2.
+:- dynamic create_sublist/2.
 % Main predicate 
 play_azul(NumberOfPlayers):- init_db(NumberOfPlayers, InitialDb),
                                         game([InitialDb | History]).
 
 % State Engine
 game([]) :- !.
-game([[Players, FactoryList, CenterTokens, Bag, GameState]| RestHistory]):-  game(RestHistory).
+game([[Players, 
+       FactoryList, 
+       CenterTokens, 
+       Bag, 
+       GameState, 
+       FloorLine, 
+       TokensInTopBox]| RestHistory]):-  change_state(GameState, NewGameState),
+                                         put_initial_token_in_the_center(CenterTokens, NewCenterTokens),
+                                         put_tokens([Bag, TokensInTopBox], FactoryList, FactoryListStep1, [NewBag, NewTokensInTopBox]),
+                                         %compound_name_arguments(NewFactoryListCompound, NameFactory, NewFactoryList),
+                                         %players_decisions(Players, FactoryListStep1, ),
+                                         game([[Players, NewFactoryList, NewCenterTokens, NewBag, NewGameState, NewFloorLine, NewTokensInTopBox] |RestHistory]).
 
+equal(X, Y):- X == Y.
+put_tokens([Bag | TokensInTopBox], [], [], [Bag | TokensInTopBox]):- !.
+put_tokens([Bag , TokensInTopBox], 
+           [HeadF | FactoryList], 
+           [ NewHeadF | NewFactoryLists], 
+           [LastBag , LastTokensInTopBox] ):- partition(equal(non_color), HeadF, EmptyPartOfFactory, PartWithColors),
+                                              fill_empty([Bag , TokensInTopBox], EmptyPartOfFactory, NewPart, NewBag, NewTokensInTopBox),
+                                              append(NewPart, PartWithColors, NewHeadF),
+                                              put_tokens([NewBag , NewTokensInTopBox], FactoryList, NewFactoryList, [LastBag , LastTokensInTopBox]).
+
+fill_empty([Bag | TokensInTopBox], 
+            EmptyPartOfFactory, 
+            NewPart, 
+            NewBag, 
+            NewTokensInTopBox ):- length(EmptyPartOfFactory, TotalCount),
+                                  take_from(Bag, TotalCount, TakedFromBag),
+                                  length(TakedFromBag, CountFromBag), CountFromTopBox is TotalCount - CountFromBag,
+                                  take_from(TokensInTopBox, CountFromTopBox, TakedFromTopBox),
+                                  append(TakedFromBag, TakedFromTopBox, NewPart),
+                                  append(NewBag, TakedFromBag, Bag),
+                                  append(NewTokensInTopBox, TakedFromTopBox, TokensInTopBox).
+
+take_from([], _, []):- !.
+take_from(_, 0, []):- !.
+take_from( PlaceForTake, Count, [Element| Tail]):- random_select(Element, PlaceForTake, Rest),
+                                                   NewCount is Count -1,
+                                                   take_from(Rest, NewCount, Tail).
+
+put_initial_token_in_the_center(CenterTokens, NewCenterTokens) :- compound_name_arguments(CenterTokens, _, Arg),
+                                                                  append(Arg1, [(init__token, 0)], Arg),
+                                                                  append(Arg1, [(init__token, 1)], NewCenterTokens).
+
+change_state(OldGameState, NewGameState):- call(OldGameState, Round, Phase),
+                                           concat(round, RoundNumberStr, Round), atom_number(RoundNumberStr, RoundNumber),
+                                           NewRoundNumber is RoundNumber + 1,
+                                           switch_phase(Phase, NewPhase),
+                                           concat(NewRound, round, NewRoundNumber),
+                                           compound_name_arguments(NewGameState, game_state, [NewRound, NewPhase]).
+
+switch_phase(non_step, factory_offert).
+switch_phase(factory_offert, building_wall).
+switch_phase(building_wall, next_round_preparation).
+switch_phase(next_round_preparation, factory_offert).
 % init database for each kind of game (depends of the number of players)
-init_db(NumberOfPlayers, [Players, FactoryList, CenterTokens, Bag, GameState]):-  build_players(NumberOfPlayers, Players),
-                                                                        assert_list(Players),
-                                                                        number_of_factories_by_number_of_players(NumberOfPlayers, NumberOfFactories),
-                                                                        build_factories(NumberOfFactories, FactoryList),
-                                                                        assert_list(FactoryList),
-                                                                        Bag = bag((blue, 20), (yellow, 20), (red, 20), (balck, 20), (white, 20)),
-                                                                        assertz(Bag),
-                                                                        CenterTokens = center_tokens((blue, 0), (yellow, 0), (red, 0), (balck, 0), (white, 0)),
-                                                                        assertz(CenterTokens),
-                                                                        GameState = game_state(round0, non_step),
-                                                                        assertz(GameState).
+init_db(NumberOfPlayers, 
+        [Players, 
+        FactoryList, 
+        CenterTokens, 
+        Bag, 
+        GameState, 
+        FloorLine, 
+        TokensInTopBox]):-  build_players(NumberOfPlayers, Players),
+                            number_of_factories_by_number_of_players(NumberOfPlayers, NumberOfFactories),
+                            build_factories(NumberOfFactories, FactoryList),
+                            create_list([(color(blue), 20),(color(yellow), 20), (color(red), 20), (color(balck), 20), (color(white), 20)], Bag),
+                            CenterTokens = [],                                                                        
+                            GameState = game_state(round0, non_step),                                                                
+                            FloorLine = floor_line(non_color, non_color, non_color, non_color, non_color, non_color, non_color),                                                                        
+                            TokensInTopBox = [].                                                                        
 
 
 assert_list([]):- !.
@@ -35,9 +93,7 @@ build_player_info( PlayerNumber, Info) :- compose_board(X),
 
 build_factories(0, []) :- !.
 build_factories(NumberOfFactories, [Head | FactoryList]):- X is NumberOfFactories - 1,
-                                                           initial_factory(L),
-                                                           concat(factory, NumberOfFactories, F),
-                                                           compound_name_arguments(Head, F, L),
+                                                           initial_factory(Head),                                                           
                                                            build_factories(X, FactoryList).
 
 initial_factory([non_color, non_color, non_color, non_color]).
@@ -56,7 +112,6 @@ pattern_lines( 1, [ ( non_color, 1 ) ]) :- !.
 pattern_lines( Pattern_length, [(non_color, Pattern_length) | Tail]) :- Y is Pattern_length - 1,
                                                                           pattern_lines(Y, Tail).
 
-floor_line(X) :- X >= 0, X =< 7.
 
 %%% The wall (like Pink Floyd :) )
 minor_position( Compound, Position, Color):- arg(Pos, Compound, Color),
@@ -105,11 +160,23 @@ format_db([Players, FactoryList, CenterTableState, BagState, GameState]):- write
                                                                 write('-----FACTORIES----'),nl,
                                                                 format_factories(FactoryList),
                                                                 write('---CENTER TABLE---'),nl,
-                                                                compound_name_arguments(CenterTableState, _, Count),
-                                                                write(Count), nl,
+                                                                %compound_name_arguments(CenterTableState, _, Count),
+                                                                write(CenterTableState), nl,
                                                                 write('------  BAG  -----'),nl,
-                                                                compound_name_arguments(BagState, _, TokensInBag),
-                                                                format('~w', [TokensInBag]), nl,
+                                                                %compound_name_arguments(BagState, _, TokensInBag),
+                                                                format('~w', [BagState]), nl,
                                                                 write('------GAME STATE--'),nl,
-                                                                compound_name_arguments(GameState, _, Game),
-                                                                format('~w', [Game]), nl,nl.
+                                                                %compound_name_arguments(GameState, _, Game),
+                                                                format('~w', [GameState]), nl,nl.
+
+% Auxiliar methods
+create_sublist([], []):- !.
+create_sublist([Head| ElementsAndRepetitions], [H | List]):-  Head =.. [_, Element, Repetitions],
+                                                           assertz(Element),
+                                                           compound_name_arguments(Element, Instanciator, _),
+                                                           length(H, Repetitions),
+                                                           maplist(Instanciator, H),
+                                                           retract(Element),
+                                                           create_sublist(ElementsAndRepetitions, List).
+
+create_list(ElementsAndRepetitions, List) :- create_sublist(ElementsAndRepetitions, L), append(L, List).
