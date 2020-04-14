@@ -17,7 +17,12 @@ game([[Players,
                                          change_state(GameState, NewGameState),
                                          game([[NewPlayersState, NewFactoryList, NewCenterTokens, NewBag, NewGameState, NewFloorLine, NewTokensInTopBox] |RestHistory]).
 
-players_decisions(Players, FactoryList, )
+players_decisions([CurrentP | Players], 
+                  CurrentFactoryList, 
+                  CurrentCenterTokens,
+                  NewPlayers,
+                  NewFactoryList,
+                  NewCenterTokens):- .
 
 equal(X, Y):- X == Y.
 put_tokens([Bag , TokensInTopBox], [], [], [Bag , TokensInTopBox]):- !.
