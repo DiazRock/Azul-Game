@@ -10,35 +10,55 @@ game([
 FactoryList,
 CenterTokens,
 Bag,
-(_, factory_offert),
-TokensInTopBox]| RestHistory]):- put_tokens([Bag, TokensInTopBox], FactoryList,
-                                 FactoryListWithPuttedTokens, [NewBag, NewTokensInTopBox]),
-                                 players_decisions(Players,
-                                 FactoryListWithPuttedTokens,
-                                 CenterTokens,
-                                 NewPlayersState,
+(Round, factory_offert),
+TokensInTopBox]| RestHistory]):- length(FactoryList, CountFactories),
+                                 fill_factories(Bag, TokensInTopBox,
+                                 NewFactoryList, CountFactories),
+                                 players_decisions_in_factory_offert(Players,
                                  NewFactoryList,
-                                 NewCenterTokens),
-                                 change_state((_, factory_offert), NewGameState),
+                                 CenterTokens,
+                                 NewPlayersState),
+                                 NewGameState= (Round, building_wall),
                                  game([[NewPlayersState, NewFactoryList,
                                  NewCenterTokens, NewBag, NewGameState,
                                  NewTokensInTopBox] |RestHistory]).
 
+players_decisions_in_factory_offert(_, [], [], _):- !.
 
-players_decisions([CurrentP | Players], 
-CurrentFactoryList,
-CurrentCenterTokens,
-NewPlayers,
-NewFactoryList,
-NewCenterTokens):- format_state(
+players_decisions_in_factory_offert([CurrentP | Players], 
+FactoryList,
+CenterTokens,
+NewPlayersState):- format_state(
                    CurrentP, CurrentFactoryList, CurrentCenterTokens),
                    choose_the_place_for_take(
-                   PlaceForTake,
-                   [CurrentCenterTokens| CurrentFactoryList]),
+                   FactoryList,
+                   CenterTokens,
+                   NewFactoryList,
+                   NewCenterTokens),
                    
                    .
 
-choose_the_place_for_take(PlaceForTake, ListOfOptions) :- .
+choose_the_place_for_take(FactoryList, 
+                          CenterTokens,
+                          NewFactoryList,
+                          NewCenterTokens):- write("Write factory_list., for take from the factory list "),
+                                             write("Write center_tokens., for take from the center tokens "),
+                                             read(PlaceForTake),
+                                             take_from_center(PlaceForTake,
+                                             CenterTokens,
+                                             NewCenterTokens),
+                                             take_from_factory_list(PlaceForTake,
+                                             FactoryList,
+                                             NewFactoryList).
+
+take_from_center(factory_list,
+                CenterTokens,
+                CenterTokens):- !.
+
+take_from_center(center_tokens,
+                CenterTokens,
+                NewCenterTokens):- write("You choose take tokens from center").
+
 
 from_center_or_from_factorylist(random_user,
                                 PlaceForTake,
@@ -49,22 +69,29 @@ from_center_or_from_factorylist(random_user,
                                         ValidPlaces).
 
 equal(X, Y):- X == Y.
-put_tokens([Bag, TokensInTopBox], [], [], [Bag, TokensInTopBox]):- !.
-%Four steps.
-put_tokens([Bag, TokensInTopBox],
-           [HeadF | FactoryList],
-           [NewHeadF | NewFactoryList],
-           [LastBag , LastTokensInTopBox] ):- partition(equal(non_color),
-                                              HeadF,
-                                              EmptyPartOfFactory,
-                                              PartWithColors),
-                                              fill_empty([Bag, TokensInTopBox],
-                                              EmptyPartOfFactory, NewPart,
-                                              [NewBag, NewTokensInTopBox]),
-                                              append(NewPart, PartWithColors, NewHeadF),
-                                              put_tokens([NewBag, NewTokensInTopBox],
-                                              FactoryList, NewFactoryList, [LastBag,
-                                              LastTokensInTopBox]).
+
+
+% Si la bolsa se queda vacía, llenarla con los elementos de la tapa de la caja
+
+fill_factories(_, _, [], 0):- !.
+
+fill_factories(Bag, TokensInTopBox,
+_, _):- length(Bag, L), L < 4, 
+     append(Bag, TokensInTopBox, NewBag),
+     fill_factories(NewBag, [],
+     _, _).
+
+fill_factories(Bag, _,
+[HeadFactory| FactoryList],
+CountFactories):- X is CountFactories - 1,
+                  random_tokens(Bag, NewBag, HeadFactory),
+                  fill_factories(NewBag, _, FactoryList, X).
+
+random_tokens(Bag, NewBag, HeadFactory):- random_select(Token1, Bag, BagStep1),
+                                          random_select(Token2, BagStep1, BagStep2),
+                                          random_select(Token3, BagStep2, BagStep3),
+                                          random_select(Token4, BagStep3, NewBag),
+                                          append([Token1, Token2, Token3, Token4], [], HeadFactory).
 
 fill_empty([Bag, TokensInTopBox],
             EmptyPartOfFactory,
@@ -83,15 +110,15 @@ take_from( PlaceForTake, Count, [Element| Tail], NewPlaceForTake):- random_selec
                                                                     take_from(Rest, NewCount, Tail, NewPlaceForTake).
 
 
-change_state(OldGameState, NewGameState):- call(OldGameState, Round, Phase),
-                                           concat(round, RoundNumberStr, Round), 
-                                           atom_number(RoundNumberStr, RoundNumber),
-                                           NewRoundNumber is RoundNumber + 1,
-                                           switch_phase(Phase, NewPhase),
-                                           concat(NewRound, round, NewRoundNumber),
-                                           compound_name_arguments(NewGameState, game_state, [NewRound, NewPhase]).
+change_state(Round, NameOfPhase):- call(OldGameState, Round, Phase),
+                                   concat(round, RoundNumberStr, Round), 
+                                   atom_number(RoundNumberStr, RoundNumber),
+                                   NewRoundNumber is RoundNumber + 1,
+                                   switch_phase(Phase, NewPhase),
+                                   concat(NewRound, round, NewRoundNumber),
+                                   compound_name_arguments(NewGameState, game_state, [NewRound, NewPhase]).
 
-switch_phase(non_step, factory_offert).
+
 switch_phase(factory_offert, building_wall).
 switch_phase(building_wall, next_round_preparation).
 switch_phase(next_round_preparation, factory_offert).
@@ -231,7 +258,7 @@ format_state(CurrentP,
                                     write('----Take from the factory list:----'),nl,
                                     format_factories(CurrentFactoryList),nl,
                                     write('---Or take from the top of the center of the table'), nl,
-                                    format('~w', CurrentCenterTokens), nl,nl
+                                    format('~w', CurrentCenterTokens), nl,nl.
 % Auxiliar methods
 create_sublist([], []):- !.
 create_sublist([Head| ElementsAndRepetitions], 
