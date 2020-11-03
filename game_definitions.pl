@@ -38,35 +38,80 @@ NewPlayersState):- format_state(
                    
                    .
 
-choose_the_place_for_take(FactoryList, 
+% Para el caso de si el centro de mesa o la factory list están vacíos,
+%se hace una llamada diferente a la función.
+choose_the_place_for_take(FactoryList,
                           CenterTokens,
                           NewFactoryList,
-                          NewCenterTokens):- write("Write factory_list., for take from the factory list "),
-                                             write("Write center_tokens., for take from the center tokens "),
-                                             read(PlaceForTake),
-                                             take_from_center(PlaceForTake,
-                                             CenterTokens,
-                                             NewCenterTokens),
-                                             take_from_factory_list(PlaceForTake,
-                                             FactoryList,
-                                             NewFactoryList).
+                          NewCenterTokens,
+                          TakedTokens):- write('Write factory_list., for take from the factory list'),
+                                         write('Write center_tokens., for take from the center tokens'),
+                                         read(PlaceForTake),
+                                         take_from_center(PlaceForTake,
+                                         CenterTokens,
+                                         TakedTokens,
+                                         NewCenterTokens),
+                                         take_from_factory_list(PlaceForTake,
+                                         FactoryList,
+                                         TakedTokens,
+                                         NewFactoryList,
+                                         TokensToTheCenter),
+                                         append(CenterTokens, TokensToTheCenter, NewCenterTokens).
+ 
+
+take_from_factory_list(center_tokens,
+                       _,
+                       _,
+                       _,
+                       [] ):- !.
+
+take_from_factory_list(factory_list,
+                       FactoryList,
+                       TakedTokens,
+                       NewFactoryList,
+                       TokensToTheCenter ):- write('You choose take tokens from factory list'),
+                                           write('Those are the factories:'),
+                                           format_factories(FactoryList),
+                                           length(FactoryList, L),
+                                           format('Choose the factory from you want to take\n, entering a number from 1 to ~w', L),
+                                           read(FactoryNumber),
+                                           nth0(FactoryNumber, FactoryList, Factory, NewFactoryList),
+                                           write('You selected the factory with the following tokens'),
+                                           sort(0,
+                                           @=<,
+                                           Factory,
+                                           SortedFactory),
+                                           write(SortedFactory),
+                                           write('Remember, you can only take all tokens from one color'),
+                                           write('Enter your color option:'),
+                                           read(ColorOption),
+                                           partition(equal(ColorOption),
+                                           Factory,
+                                           TakedTokens,
+                                           TokensToTheCenter).
 
 take_from_center(factory_list,
-                CenterTokens,
-                CenterTokens):- !.
+                _,
+                _,
+                _):- !.
 
 take_from_center(center_tokens,
                 CenterTokens,
-                NewCenterTokens):- write("You choose take tokens from center").
+                TakedTokens,
+                NewCenterTokens):- write('You choose take tokens from center'),
+                                   write('Those are the tokens in the center of the table:'),
+                                   sort(0, @=<, CenterTokens, SortedCenter),
+                                   write(SortedCenter),
+                                   write('The options that you have are the following'),
+                                   sort(SortedCenter, SortWithNoRepetitions),
+                                   write('Remember, you can only take all tokens from one color'),
+                                   write('Enter your color option:'),
+                                   read(ColorOption),
+                                   partition(equal(ColorOption),
+                                   CenterTokens,
+                                   TakedTokens,
+                                   NewCenterTokens).
 
-
-from_center_or_from_factorylist(random_user,
-                                PlaceForTake,
-                                Places):- %remove the current center tokens if empty
-                                        partition(is_empty,
-                                        Places, ValidPlaces, _),
-                                        random_member(PlaceForTake,
-                                        ValidPlaces).
 
 equal(X, Y):- X == Y.
 
@@ -228,7 +273,8 @@ format_player(Player):- compound_name_arguments(Player, PlayerName, Board),
 
 
 format_factories([]) :- write('').
-format_factories([Head | Tail]) :- format('~w', [Head]),nl, 
+format_factories([Head | Tail]) :- sort(0, @=<, Head, SortedHead),
+                                   format('~w', [SortedHead]),nl, 
                                    format_factories(Tail).
 
 format_db([Players, FactoryList,
