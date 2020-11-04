@@ -28,16 +28,110 @@ players_decisions_in_factory_offert(_, [], [], _):- !.
 players_decisions_in_factory_offert([CurrentP | Players], 
 FactoryList,
 CenterTokens,
-NewPlayersState):- format_state(
-                   CurrentP, CurrentFactoryList, CurrentCenterTokens),
-                   choose_the_place_for_take(
-                   FactoryList,
-                   CenterTokens,
-                   NewFactoryList,
-                   NewCenterTokens),
+NewPlayersState):- 
                    
                    .
 
+player_in_factory_offert(CurrentState,
+                          NewState,
+                          FactoryList,
+                          CenterTokens,
+                          NewFactoryList,
+                          NewCenterTokens):- format_state(
+                                             CurrentState,
+                                             CurrentFactoryList,
+                                             CurrentCenterTokens),
+                                             choose_the_place_for_take(
+                                             FactoryList,
+                                             CenterTokens,
+                                             NewFactoryList,
+                                             NewCenterTokens,
+                                             TakedTokens),
+                                             compound_name_arguments(CurrentState,
+                                             PlayerName,
+                                             [PatternLines, 
+                                             Wall, 
+                                             ScoreTrack, 
+                                             FloorLine]),
+                                             format('Player ~w has the following board:',
+                                             PlayerName),
+                                             format_board([PatternLines,
+                                             Wall,
+                                             ScoreTrack,
+                                             FloorLine]),
+                                             format('You have the following taked tokens: '),nl,
+                                             write(TakedTokens),
+                                             format('You have the following pattern_line'),nl,
+                                             format_wall(PatternLines),
+                                             format('You can choose one of the followings:'),nl,
+                                             TakedTokens = [Token | _],
+                                             partition(
+                                                full_with_other_token(Token, Wall),
+                                                PatternLines,
+                                                _,
+                                                PossibleElections),
+                                             partition(
+                                                token_already_in_wall(Token, Wall),
+                                                PossibleElections,
+                                                _,
+                                                PossibleElectionsWithoutTokenInWall)
+                                             ),
+                                             format('You can choose one of the following pattern lines'),nl,
+                                             write(PossibleElectionsWithoutTokenInWall),
+                                             length(PossibleElectionsWithoutTokenInWall, Len)
+                                             format('Choose a number between 1 to ~w', 
+                                             Len),
+                                             read(IndexFromPossibleElection),
+                                             nth1(IndexFromPossibleElection, 
+                                             PossibleElectionsWithoutTokenInWall,
+                                             PatternLineElected),
+                                             nth1(IndexInTheOriginalPatternLine,
+                                             PatternLines,
+                                             PatternLineElected,
+                                             RemainderPatternLines),
+                                             partition(equal(non_color),
+                                             PatternLineElected,
+                                             NonColorPart,
+                                             PartWithColor),
+                                             length(NonColorPart, LengthNonColorPart),
+                                             take_n(LengthNonColorPart,
+                                             ForFillPattern,
+                                             TakedTokens,
+                                             RemainderFromTaked),
+                                             append(ForFillPattern,
+                                             PartWithColor,
+                                             NewPatternLine),
+                                             append(FloorLine,
+                                             RemainderFromTaked,
+                                             NewFloorLine),
+                                             take_n(IndexInTheOriginalPatternLine,
+                                             LessThanIndex,
+                                             RemainderPatternLines,
+                                             GreatherThanIndex
+                                             ),
+                                             append([LessThanIndex, 
+                                             NewPatternLine,
+                                             GreatherThanIndex],
+                                             NewPatternLines),
+                                             NewGameState= [NewPatternLines, 
+                                             Wall, 
+                                             ScoreTrack, 
+                                             NewFloorLine] .
+
+token_already_in_wall (Token,
+                       Wall,
+                       Pattern):- length(Pattern, IndexLineWall),
+                                 nth1(IndexLineWall, Wall, LineWall),
+                                 member((Token, full), LineWall).
+
+full_with_other_token(Token,
+                      Pattern):- partition(equal(non_color),
+                                 Pattern,
+                                 NonColorPart,
+                                 WithoutNonColor),
+                                 NonColorPart \== Pattern,
+                                 not(member(Token, Pattern)).
+                                           
 % Para el caso de si el centro de mesa o la factory list están vacíos,
 %se hace una llamada diferente a la función.
 choose_the_place_for_take(FactoryList,
@@ -57,7 +151,6 @@ choose_the_place_for_take(FactoryList,
                                          NewFactoryList,
                                          TokensToTheCenter),
                                          append(CenterTokens, TokensToTheCenter, NewCenterTokens).
- 
 
 take_from_factory_list(center_tokens,
                        _,
@@ -92,7 +185,7 @@ take_from_factory_list(factory_list,
 
 take_from_center(factory_list,
                 _,
-                _,
+                [],
                 _):- !.
 
 take_from_center(center_tokens,
@@ -109,8 +202,15 @@ take_from_center(center_tokens,
                                    read(ColorOption),
                                    partition(equal(ColorOption),
                                    CenterTokens,
-                                   TakedTokens,
-                                   NewCenterTokens).
+                                   TakedTokensStep1,
+                                   NewCenterTokensStep1),
+                                   partition(equal(init_token),
+                                   NewCenterTokensStep1,
+                                   InitToken,
+                                   NewCenterTokens),
+                                   append(TakedTokensStep1, 
+                                   InitToken,
+                                   TakedTokens).
 
 
 equal(X, Y):- X == Y.
@@ -215,9 +315,14 @@ init_center_table(0).
 %% Board parts
 score_track(X) :- integer(X), X >= 0.
 
-pattern_lines( 1, [ ( non_color, 1 ) ]) :- !.
-pattern_lines( Pattern_length, [(non_color, Pattern_length) | Tail]) :- Y is Pattern_length - 1,
-                                                                          pattern_lines(Y, Tail).
+pattern_lines( 1, [ non_color ]) :- !.
+pattern_lines( Pattern_length,
+[ Pattern | Tail]) :- Y is Pattern_length - 1,
+                      assertz(instantiator(non_color)),
+                      length(Pattern, Pattern_length),
+                      maplist(instantiator, Pattern),
+                      retract(instantiator),
+                      pattern_lines(Y, Tail).
 
 
 %%% The wall (like Pink Floyd :) )
@@ -319,3 +424,6 @@ create_sublist([Head| ElementsAndRepetitions],
 create_list(ElementsAndRepetitions, List):- create_sublist(ElementsAndRepetitions, L),
                                             append(L, List).
 is_empty([]).
+
+take_n(0, [], X, X) :- !.
+take_n(N, [X|Xs], [X|Ys], R) :- M is N-1, take_n(M, Xs, Ys, R).
