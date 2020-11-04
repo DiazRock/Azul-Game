@@ -35,7 +35,7 @@ NewPlayersState):-
                    CenterTokens,
                    NewFactoryList,
                    NewCenterTokens),
-                   append(Players, [NewState], Players1)
+                   append(Players, [NewState], Players1),
                    players_decisions_in_factory_offert(
                    Players1,
                    NewFactoryList,
@@ -85,12 +85,11 @@ player_in_factory_offert(CurrentState,
                                                 token_already_in_wall(Token, Wall),
                                                 PossibleElections,
                                                 _,
-                                                PossibleElectionsWithoutTokenInWall)
-                                             ),
+                                                PossibleElectionsWithoutTokenInWall),
                                              format('You can choose one of the following pattern lines'),nl,
                                              write(PossibleElectionsWithoutTokenInWall),
-                                             length(PossibleElectionsWithoutTokenInWall, Len)
-                                             format('Choose a number between 1 to ~w', 
+                                             length(PossibleElectionsWithoutTokenInWall, Len),
+                                             format('Choose a number between 1 to ~w',
                                              Len),
                                              read(IndexFromPossibleElection),
                                              nth1(IndexFromPossibleElection, 
@@ -129,7 +128,7 @@ player_in_factory_offert(CurrentState,
                                              ScoreTrack, 
                                              NewFloorLine] .
 
-token_already_in_wall (Token,
+token_already_in_wall(Token,
                        Wall,
                        Pattern):- length(Pattern, IndexLineWall),
                                  nth1(IndexLineWall, Wall, LineWall),
@@ -326,15 +325,16 @@ init_center_table(0).
 %% Board parts
 score_track(X) :- integer(X), X >= 0.
 
-pattern_lines( 1, [ non_color ]) :- !.
+pattern_lines( 1, [ [non_color] ]) :- !.
 pattern_lines( Pattern_length,
-[ Pattern | Tail]) :- Y is Pattern_length - 1,
-                      assertz(instantiator(non_color)),
+[ Pattern | Tail]) :- compound_name_arguments(Instantiator, 
+                      instantiator, [non_color]),
+                      assertz(Instantiator),
                       length(Pattern, Pattern_length),
                       maplist(instantiator, Pattern),
-                      retract(instantiator),
-                      pattern_lines(Y, Tail).
-
+                      retract(Instantiator),
+                      Y is Pattern_length - 1,
+                      pattern_lines(Y, Tail), !.
 
 %%% The wall (like Pink Floyd :) )
 minor_position( Compound, Position, Color):- arg(Pos, Compound, Color),
