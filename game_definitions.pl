@@ -23,13 +23,24 @@ TokensInTopBox]| RestHistory]):- length(FactoryList, CountFactories),
                                  NewCenterTokens, NewBag, NewGameState,
                                  NewTokensInTopBox] |RestHistory]).
 
-players_decisions_in_factory_offert(_, [], [], _):- !.
+players_decisions_in_factory_offert(PlayersState, [], [], NewPlayersState):- PlayersState == NewPlayersState, !.
 
 players_decisions_in_factory_offert([CurrentP | Players], 
 FactoryList,
 CenterTokens,
 NewPlayersState):- 
-                   
+                   player_in_factory_offert(CurrentP,
+                   NewState,
+                   FactoryList,
+                   CenterTokens,
+                   NewFactoryList,
+                   NewCenterTokens),
+                   append(Players, [NewState], Players1)
+                   players_decisions_in_factory_offert(
+                   Players1,
+                   NewFactoryList,
+                   NewCenterTokens,
+                   NewPlayersState)
                    .
 
 player_in_factory_offert(CurrentState,
