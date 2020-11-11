@@ -30,22 +30,23 @@ TokensInTopBox]):- length(FactoryList, CountFactories),
 game([Players,
       [],
       [],
-      Bag,
+      /* Bag */_,
       (Round, building_wall),
-      TokensInTopBox]):-format('***** The building wall phase for ~w *****',
+      /* TokensInTopBox */_]):-format('***** The building wall phase for ~w *****',
                         Round),nl, 
                         player_decisions_in_building_wall(
                            Players,
-                           NewPlayersState,
-                           NewTokensInTopBox
-                        ),
+                           /* NewPlayersState */_,
+                           /* NewTokensInTopBox */_
+                        )/* ,
                         append(NewTokensInTopBox, T),
                         game([NewPlayersState,
                         [],
                         [],
                         Bag,
                         (Round, score_point),
-                        [T | TokensInTopBox]])
+                        [T | TokensInTopBox]]) */
+
                         .
 
 player_decisions_in_building_wall(
@@ -75,13 +76,17 @@ player_decisions_in_building_wall(
                                         NewScoreTrack),
                                         append(NewTokensInTopBox1,
                                         NewTokensInTopBox),
-                                        format('Now this is the wall for ~w',
+                                        format('*************************************'),nl,
+                                        format('Now this is the new wall for ~w',
                                         PlayerName),nl,
                                         format_wall(NewWall),nl,
-                                        format('And those are the pattern lines'),nl,
+                                        format('This the new score '),nl,
+                                        write(NewScoreTrack),nl,
+                                        format('And those are the new pattern lines'),nl,
                                         format_wall(NewPatternLines),
                                         format('And the following tokens were moved to the top of the box'),nl,
                                         write(NewTokensInTopBox),nl,
+                                        format('*************************************'),nl,
                                         NewScore is NewScoreTrack + ScoreTrack,
                                         NewPState= [
                                            NewPatternLines,
@@ -89,6 +94,7 @@ player_decisions_in_building_wall(
                                            NewScore,
                                            FloorLine
                                         ],
+
                                         player_decisions_in_building_wall(
                                            Players,
                                            NewPlayersState,
@@ -100,11 +106,16 @@ make_score(PieceOfTheWallForCountPoints,
            NewRowWall,
            DownWall,
            Token,
-           CurrentScore):- count_score(NewRowWall, S1),
-                           reverse(NewRowWall, NewRowWallRev),
-                           count_score(NewRowWallRev, S2),
-                           
-                           nth1(Index, NewRowWall, (Token, full)),
+           CurrentScore):- 
+                           nth1(Index, NewRowWall, (Token, full), List),
+                           part_list(Index,
+                           List,
+                           LeftNewRowWal,
+                           RightNewRowWal),
+                           count_score(RightNewRowWal, S1),
+                           reverse(LeftNewRowWal, LeftNewRowWalRev),
+                           count_score(LeftNewRowWalRev, S2),
+
                            peek_column(
                            PieceOfTheWallForCountPoints,
                            Index,
@@ -114,12 +125,18 @@ make_score(PieceOfTheWallForCountPoints,
                            DownWall,
                            Index,
                            ColumnDown),
+                           write(ColumnUp),nl,
 
                            count_score(ColumnUp, S3),
                            count_score(ColumnDown, S4),
                            CurrentScore is S1 + S2 + S3 + S4
                            .
 
+part_list(Index, List, List1, List2):- length(List1, Index),
+                                       length(List, L),
+                                       L2 is L - Index,
+                                       length(List2, L2),
+                                       append(List1, List2, List).
 
 peek_column([],  _, []).
 peek_column([ Line| Wall], 
@@ -153,11 +170,12 @@ move_token_from_full_pattern_line_to_wall([CurrentPatternLine | PatternLines],
                                           [NewPatternLine |NewPatternLines],
                                           PieceOfTheWallForCountPoints,
                                           [NewRowWall | NewWall],
-                                          [CurrentPatternLine | TokensInTopBox],
+                                          [PatternLineWithOutFirstToken | TokensInTopBox],
                                           NewScoreTrack):-  
                                                             not(member(non_color,
                                                                CurrentPatternLine)),
-                                                            CurrentPatternLine= [Token | _],
+                                                            CurrentPatternLine= 
+                                                            [Token | PatternLineWithOutFirstToken],
                                                             format('Moving the token ~w from pattern line ~w to the row \n~w in the player wall',
                                                             [Token,
                                                             CurrentPatternLine,
@@ -165,7 +183,6 @@ move_token_from_full_pattern_line_to_wall([CurrentPatternLine | PatternLines],
                                                             move_token_to_row_in_wall(Token,
                                                             CurrentRowWall,
                                                             NewRowWall),
-                                                            
                                                             append(PieceOfTheWallForCountPoints,
                                                             [CurrentRowWall],
                                                             NewPieceOfTheWallForCountPoints ),
@@ -187,7 +204,7 @@ move_token_from_full_pattern_line_to_wall([CurrentPatternLine | PatternLines],
                                                             NewWall,
                                                             TokensInTopBox,
                                                             NewScore),
-                                                            NewScoreTrack is CurrentScore + NewScore
+                                                            NewScoreTrack is CurrentScore + NewScore + 1
                                                             .
 
 
