@@ -17,11 +17,12 @@ TokensInTopBox]):- length(FactoryList, CountFactories),
                    CountFactories),
                    format('***** The factory offert phase for ~w *****',
                    Round),nl,
+                   
                    players_decisions_in_factory_offert(Players,
                    NewFactoryList,
                    CenterTokens,
                    NewPlayersState,
-                   T) ,
+                   T),
                    NewGameState= (Round, building_wall),
                    game([NewPlayersState, [],
                    [], Bag, NewGameState,
@@ -30,84 +31,245 @@ TokensInTopBox]):- length(FactoryList, CountFactories),
 game([Players,
       [],
       [],
-      /* Bag */_,
+      Bag,
       (Round, building_wall),
-      /* TokensInTopBox */_]):-format('***** The building wall phase for ~w *****',
+      TokensInTopBox]):-format('***** The building wall phase for ~w *****',
                         Round),nl, 
                         player_decisions_in_building_wall(
                            Players,
-                           /* NewPlayersState */_,
-                           /* NewTokensInTopBox */_
-                        )/* ,
-                        append(NewTokensInTopBox, T),
-                        game([NewPlayersState,
-                        [],
-                        [],
-                        Bag,
-                        (Round, score_point),
-                        [T | TokensInTopBox]]) */
+                           NewPlayersState,
+                           NewTokensInTopBox
+                        ),
+                        
+                        check_next_phase(NewPlayersState,
+                        Round,
+                        NewRound,
+                        Phase ),
 
+                        length(Players, PlayersLen),
+                        number_of_factories_by_number_of_players(PlayersLen, Numb),
+                        length(FactoryList, Numb),
+                        maplist(is_empty, FactoryList),
+                        
+                        append(NewTokensInTopBox, 
+                        TokensInTopBox, 
+                        TokensForNextRound),
+
+                        game([NewPlayersState,
+                        FactoryList,
+                        [init_token],
+                        Bag,
+                        (NewRound, Phase),
+                        TokensForNextRound])
                         .
+
+game([Players,
+      _,
+      _,
+      _,
+      (Round, final),
+      _]):- format('The final phase for ~w', Round),nl,
+            count_points_in_final_phase(Players, PlayersScore),
+            write('pasó el count_points'),nl,
+            write(PlayersScore),nl,
+            select_winner(Players, PlayersScore, Winner),
+            format('The ~w is the winner !!!!!!!', Winner), !.
+
+
+select_winner(Players, PlayersScore, Winner):- 
+                                               max_score(PlayersScore, Max),
+                                               nth1(Index, PlayersScore, Max),
+                                               nth1(Index, Players, PlayerWinner),
+                                               compound_name_arguments(PlayerWinner, Winner, _).
+
+max_score([Max],Max) :- !, true.
+max_score([M|PlayersScore], Max):- max_score(PlayersScore, Max), Max >= M.
+max_score([M | PlayersScore], M):- max_score(PlayersScore, Max), M > Max.
+
+count_points_in_final_phase([], []):- !.
+
+count_points_in_final_phase([CurrentP | Players], 
+                            [NewS | PlayersScore]):- write('Aquí estoy y se rompe'),nl, 
+                                                    compound_name_arguments(CurrentP,
+                                                    _,
+                                                    [_, Wall, ScoreTrack, _ ]),
+                                                    count_points_in_wall(Wall, NewScore),
+                                                    NewS is ScoreTrack + NewScore,
+                                                    count_points_in_final_phase(Players,
+                                                    PlayersScore).
+
+count_points_in_wall(Wall, Score):- count_in_rows(Wall, S1),
+                                    Wall= [Line | _],
+                                    length(Line, L),
+                                    L1 is L-1,
+                                    count_in_columns(Wall, L1, S2),
+                                    Tokens =([blue,
+                                    yellow, red, black, white]),
+                                    count_by_tokens(Wall, Tokens, S3),
+                                    Score is S1 + S2 + S3.
+
+count_in_rows([Line | Wall], Score):- not(member( (_, empty), Line )), 
+                                      count_in_rows(Wall, NewScore),
+                                      Score is NewScore + 2 .
+
+count_in_rows([_ | Wall], Score):- count_in_rows(Wall, Score).
+
+count_in_rows([], 0):- !.
+
+count_in_columns(_, 0, 0):- !.
+count_in_columns(Wall, L, Score):- I is L -1,
+                                   peek_column(Wall, L, Column),
+                                   not(member( (_, empty), Column )), 
+                                   count_in_columns(Wall, I, NewScore),
+                                   Score is NewScore + 7.
+
+
+count_in_columns(Wall, L, Score):- I is L -1,
+                                   count_in_columns(Wall, I , Score).
+
+count_by_tokens(_, [], 0):- !.
+
+count_by_tokens(Wall, 
+               [CurrentToken | Tokens], 
+               Score):- count_fulls_in_wall(Wall, CurrentToken, Count),
+                        Wall= [Line | _],
+                        length(Line, Count),
+                        count_by_tokens(Wall, Tokens, NewScore),
+                        Score is NewScore + 10.
+
+count_by_tokens(Wall, 
+               [_ | Tokens], 
+               Score):- count_by_tokens(Wall, Tokens, Score).
+
+count_fulls_in_wall([Line| Wall], Token, Count):- member((Token, full), Line),
+                                                  count_fulls_in_wall(Wall,
+                                                  Token,
+                                                  NewCount),
+                                                  Count is NewCount + 1.
+
+count_fulls_in_wall([_| Wall], Token, Count):- count_fulls_in_wall(Wall,
+                                                  Token,
+                                                  Count).
+
+count_fulls_in_wall([], _, 0):- !.
+
+check_next_phase([ CurrentP | _], 
+                Round,
+                Round,
+                final):- compound_name_arguments(CurrentP, _, [_, Wall | _ ]),
+                         check_full_row_in_wall(Wall),
+                         ! .
+
+check_next_phase([_ | Players],
+                 Round,
+                 NewRound,
+                 Phase ):- check_next_phase(Players, Round, NewRound, Phase).
+
+check_next_phase([],
+                 Round,
+                 NewRound,
+                 factory_offert):- concat(round, RoundNumber, Round),
+                                   atom_number(RoundNumber, N),
+                                   NewRoundNumber is N + 1,
+                                   concat(round, NewRoundNumber, NewRound).
+
+check_full_row_in_wall([Line | _]):- not(member((_, empty), Line)), !.
+
+check_full_row_in_wall([_ | Wall]):- check_full_row_in_wall(Wall).
 
 player_decisions_in_building_wall(
                            [],
                            [],
-                           [[]]
+                           []
                         ):- !.
 
 player_decisions_in_building_wall(
-[CurrentPlayer | Players],
-[NewPState| NewPlayersState],
-[NewTokensInTopBox | TokensInTopBox]):- compound_name_arguments(
-                                        CurrentPlayer,
-                                        PlayerName,
-                                        [PatternLines,
-                                        Wall,
-                                        ScoreTrack,
-                                        FloorLine]),
-                                        format_player(CurrentPlayer),
-                                        move_token_from_full_pattern_line_to_wall(
-                                        PatternLines,
-                                        Wall,
-                                        NewPatternLines,
-                                        [],
-                                        NewWall,
-                                        NewTokensInTopBox1,
-                                        NewScoreTrack),
-                                        append(NewTokensInTopBox1,
-                                        NewTokensInTopBox),
-                                        format('*************************************'),nl,
-                                        format('Now this is the new wall for ~w',
-                                        PlayerName),nl,
-                                        format_wall(NewWall),nl,
-                                        format('This the new score '),nl,
-                                        write(NewScoreTrack),nl,
-                                        format('And those are the new pattern lines'),nl,
-                                        format_wall(NewPatternLines),
-                                        format('And the following tokens were moved to the top of the box'),nl,
-                                        write(NewTokensInTopBox),nl,
-                                        format('*************************************'),nl,
-                                        NewScore is NewScoreTrack + ScoreTrack,
-                                        NewPState= [
-                                           NewPatternLines,
-                                           NewWall,
-                                           NewScore,
-                                           FloorLine
-                                        ],
+         [CurrentPlayer | Players],
+         [NewPState| NewPlayersState],
+         TokensInTopBox):-       compound_name_arguments(
+                                 CurrentPlayer,
+                                 PlayerName,
+                                 [PatternLines,
+                                 Wall,
+                                 ScoreTrack,
+                                 FloorLine]),
+                                 format_player(CurrentPlayer),
+                                 move_token_from_full_pattern_line_to_wall(
+                                 PatternLines,
+                                 Wall,
+                                 NewPatternLines,
+                                 [],
+                                 NewWall,
+                                 NewTokensInTopBox1,
+                                 NewScoreTrack),
+                                 
+                                 
+                                 NewScore is NewScoreTrack + ScoreTrack,
 
-                                        player_decisions_in_building_wall(
-                                           Players,
-                                           NewPlayersState,
-                                           TokensInTopBox
-                                        )
-                                        .
+                                 penalize_floor_line(FloorLine,
+                                 ForTopBox,
+                                 Penalization),
+                                 partition(equal(init_token),
+                                          ForTopBox,
+                                          _,
+                                          ForTopBoxWithOutInitToken ),
+                                 append(NewTokensInTopBox1, [ForTopBoxWithOutInitToken],
+                                 NewTokensInTopBox2),
+                                 append(NewTokensInTopBox2,
+                                 NewTokensInTopBox),
+                                 
+                                 EmptyFloorLine = [non_color, non_color, non_color, non_color, non_color, non_color, non_color],
+                                 make_penalization(NewScore, Penalization, NewScorePenalized),
+                                 
+                                 NewPlayerInfo= [
+                                    NewPatternLines,
+                                    NewWall,
+                                    NewScorePenalized,
+                                    EmptyFloorLine   
+                                 ],
+                                 compound_name_arguments(NewPState, PlayerName, NewPlayerInfo),
+                                 format('*************************************'),nl,
+                                 format('Now this is the new wall for ~w',
+                                 PlayerName),nl,
+                                 format_wall(NewWall),nl,
+                                 format('This the score '),nl,
+                                 write(NewScore),nl,
+                                 format('With the penalization from the floor line'),nl,
+                                 write(NewScorePenalized),nl,
+                                 format('And those are the new pattern lines'),nl,
+                                 format_wall(NewPatternLines),
+                                 format('And the following tokens were moved to the top of the box'),nl,
+                                 write(NewTokensInTopBox),nl,
+                                 format('*************************************'),nl,
+
+                                 player_decisions_in_building_wall(
+                                    Players,
+                                    NewPlayersState,
+                                    OtherTokensInTopBox
+                                 ),
+                                 
+                                 append(NewTokensInTopBox,
+                                 OtherTokensInTopBox,
+                                 TokensInTopBox)
+                                 .
+
+make_penalization(S, P, 0):- P > S, !.
+make_penalization(S, P, N):- N is S - P.
+
+penalize_floor_line([non_color | _], [], 0):- !.
+penalize_floor_line([Token | FloorLine], 
+                    [Token | ForTopBox],
+                    Penalization):- penalize_floor_line(FloorLine,
+                                    ForTopBox,
+                                    P),
+                                    Penalization is P + 1 .
 
 make_score(PieceOfTheWallForCountPoints,
            NewRowWall,
            DownWall,
            Token,
            CurrentScore):- 
-                           nth1(Index, NewRowWall, (Token, full), List),
+                           nth0(Index, NewRowWall, (Token, full), List),
                            part_list(Index,
                            List,
                            LeftNewRowWal,
@@ -125,7 +287,6 @@ make_score(PieceOfTheWallForCountPoints,
                            DownWall,
                            Index,
                            ColumnDown),
-                           write(ColumnUp),nl,
 
                            count_score(ColumnUp, S3),
                            count_score(ColumnDown, S4),
@@ -141,7 +302,7 @@ part_list(Index, List, List1, List2):- length(List1, Index),
 peek_column([],  _, []).
 peek_column([ Line| Wall], 
               Index, 
-              [C | Column]):- nth1(Index,
+              [C | Column]):- nth0(Index,
                               Line,
                               C),
                               peek_column(Wall,
@@ -161,7 +322,7 @@ move_token_from_full_pattern_line_to_wall([],
                                           [],
                                           _,
                                           [],
-                                          [[]],
+                                          [],
                                           0):- !.
 
 
@@ -171,8 +332,7 @@ move_token_from_full_pattern_line_to_wall([CurrentPatternLine | PatternLines],
                                           PieceOfTheWallForCountPoints,
                                           [NewRowWall | NewWall],
                                           [PatternLineWithOutFirstToken | TokensInTopBox],
-                                          NewScoreTrack):-  
-                                                            not(member(non_color,
+                                          NewScoreTrack):-  not(member(non_color,
                                                                CurrentPatternLine)),
                                                             CurrentPatternLine= 
                                                             [Token | PatternLineWithOutFirstToken],
@@ -260,13 +420,15 @@ players_decisions_in_factory_offert([CurrentP | Players],
 FactoryList,
 CenterTokens,
 NewPlayersState,
-[NewTokensInTopBox | RestTokenInTopBox]):- player_in_factory_offert(CurrentP,
+[NewTokensInTopBox | RestTokenInTopBox]):- 
+                                           player_in_factory_offert(CurrentP,
                                            FactoryList,
                                            CenterTokens,
                                            NewFactoryList,
                                            NewCenterTokens,
                                            NewPState,
                                            NewTokensInTopBox),
+                                           
                                            append(Players, 
                                            [NewPState], 
                                            Players1),
@@ -284,67 +446,67 @@ player_in_factory_offert( CurrentPlayerState,
                           NewFactoryList,
                           NewCenterTokens,
                           NewPState,
-                          NewTokensInTopBox):- format_state(
-                                             CurrentPlayerState,
-                                             FactoryList,
-                                             CenterTokens),
-                                             choose_the_place_for_take(
-                                             FactoryList,
-                                             CenterTokens,
-                                             NewFactoryList,
-                                             NewCenterTokens,
-                                             TakedTokensWhitInitToken),
-                                             compound_name_arguments(
-                                             CurrentPlayerState,
-                                             PlayerName,
-                                             [PatternLines,
-                                             Wall,
-                                             ScoreTrack,
-                                             FloorLine]),
-                                             format('~w has the following taked tokens: ',
-                                             PlayerName),nl,
-                                             format('~w', [TakedTokensWhitInitToken]),nl,
-                                             format('~w has the following pattern_line',
-                                             PlayerName),nl,
-                                             format_wall(PatternLines),nl,
-                                             partition(equal(init_token),
-                                             TakedTokensWhitInitToken,
-                                             InitToken,
-                                             TakedTokens),
-                                             put_taked_tokens_in_pattern_line(
-                                                TakedTokens,
-                                                Wall,
-                                                PatternLines,
+                          NewTokensInTopBox):-  format_state(
+                                                CurrentPlayerState,
+                                                FactoryList,
+                                                CenterTokens),
+                                                choose_the_place_for_take(
+                                                FactoryList,
+                                                CenterTokens,
+                                                NewFactoryList,
+                                                NewCenterTokens,
+                                                TakedTokensWhitInitToken),
+                                                compound_name_arguments(
+                                                CurrentPlayerState,
                                                 PlayerName,
-                                                NewPatternLines,
-                                                RemainderFromTakedWithoutInitToken
-                                             ),
+                                                [PatternLines,
+                                                Wall,
+                                                ScoreTrack,
+                                                FloorLine]),
+                                                format('~w has the following taked tokens: ',
+                                                PlayerName),nl,
+                                                format('~w', [TakedTokensWhitInitToken]),nl,
+                                                format('~w has the following pattern_line',
+                                                PlayerName),nl,
+                                                format_wall(PatternLines),nl,
+                                                partition(equal(init_token),
+                                                TakedTokensWhitInitToken,
+                                                InitToken,
+                                                TakedTokens),
+                                                put_taked_tokens_in_pattern_line(
+                                                   TakedTokens,
+                                                   Wall,
+                                                   PatternLines,
+                                                   PlayerName,
+                                                   NewPatternLines,
+                                                   RemainderFromTakedWithoutInitToken
+                                                ),
 
-                                             append(InitToken,
-                                             RemainderFromTakedWithoutInitToken,
-                                             RemainderFromTaked),
-                                             fill_floorline(FloorLine, 
-                                             RemainderFromTaked,
-                                             NewFloorLine,
-                                             NewTokensInTopBox),
+                                                append(InitToken,
+                                                RemainderFromTakedWithoutInitToken,
+                                                RemainderFromTaked),
+                                                fill_floorline(FloorLine, 
+                                                RemainderFromTaked,
+                                                NewFloorLine,
+                                                NewTokensInTopBox),
 
-                                             compound_name_arguments(
-                                             NewPState,
-                                             PlayerName,
-                                             [NewPatternLines,
-                                             Wall,
-                                             ScoreTrack,
-                                             NewFloorLine]),
+                                                compound_name_arguments(
+                                                NewPState,
+                                                PlayerName,
+                                                [NewPatternLines,
+                                                Wall,
+                                                ScoreTrack,
+                                                NewFloorLine]),
 
-                                             format('*******************************************'),nl,
-                                             format('The New pattern lines for the ~w are',
-                                             PlayerName), nl,
-                                             format_wall(NewPatternLines), nl,
-                                             format('And the floor line for that player is'),nl,
-                                             write(NewFloorLine), nl,
-                                             format('Now the center of the table is'),nl,
-                                             write(NewCenterTokens), nl,
-                                             format('*******************************************'),nl.
+                                                format('*******************************************'),nl,
+                                                format('The New pattern lines for the ~w are',
+                                                PlayerName), nl,
+                                                format_wall(NewPatternLines), nl,
+                                                format('And the floor line for that player is'),nl,
+                                                write(NewFloorLine), nl,
+                                                format('Now the center of the table is'),nl,
+                                                write(NewCenterTokens), nl,
+                                                format('*******************************************'),nl.
 
 put_taked_tokens_in_pattern_line([],
                                  _,
