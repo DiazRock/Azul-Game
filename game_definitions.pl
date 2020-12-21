@@ -70,7 +70,6 @@ game([Players,
       (Round, final),
       _]):- format('The final phase for ~w', Round),nl,
             count_points_in_final_phase(Players, PlayersScore),
-            write('pasó el count_points'),nl,
             write(PlayersScore),nl,
             select_winner(Players, PlayersScore, Winner),
             format('The ~w is the winner !!!!!!!', Winner), !.
@@ -89,7 +88,7 @@ max_score([M | PlayersScore], M):- max_score(PlayersScore, Max), M > Max.
 count_points_in_final_phase([], []):- !.
 
 count_points_in_final_phase([CurrentP | Players], 
-                            [NewS | PlayersScore]):- write('Aquí estoy y se rompe'),nl, 
+                            [NewS | PlayersScore]):-  
                                                     compound_name_arguments(CurrentP,
                                                     _,
                                                     [_, Wall, ScoreTrack, _ ]),
@@ -413,9 +412,6 @@ players_decisions_in_factory_offert(PlayersState,
                                    PlayersState,
                                    []):- !.
 
-%Tengo que valorar el caso de que no existan más patrones de línea elegibles para cada jugador.
-%Lo anterior es una shit. Si un jugador no tiene qué hacer con unos tokens de un color, que los tome y los mueva a la caja.
-% Pueden existir varios NewTokensInTopBox con la llamada a player_in_factory_offert
 players_decisions_in_factory_offert([CurrentP | Players], 
 FactoryList,
 CenterTokens,
