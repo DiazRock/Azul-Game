@@ -91,5 +91,11 @@ que se hace en esta ronda. Aquí el jugador moverá, tal como indican las reglas
 el primer azulejo de cada `PatternLine` que haya sido completado en la fase anterior,
 para la `LineWall` correspondiente, y el resto de los azulejos los devuelve a la `Bag`.
 
-Luego está la fase final, donde cada 
+Luego está la fase final, donde se cuentan los puntos de cada jugador, y se escoge
+un ganador.
+
+# Como correr el software
+
+Con una consola interactiva de prolog, como puede ser swipl, ejecutar el predicado 
+`[game_definitions].`, y leer las instrucciones para introducir los átomos pertinentes.
 
